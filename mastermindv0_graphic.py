@@ -1,6 +1,7 @@
 import random
 import tkinter as tk
 from collections import Counter
+from tkinter import messagebox  # for pop-ups
 
 # Constants for the game
 COLORS = ["Red", "Blue", "Green", "Yellow", "Black", "White"]
@@ -178,6 +179,10 @@ class MastermindGUI:
                 )
                 self.next_button.config(state="disabled")
                 self.run_all_button.config(state="disabled")
+                messagebox.showinfo(
+                    "Winner",
+                    f"WINNER \n The target was found in generation {self.generation}!",
+                )
                 return
 
         # Divide population by 2, keeping the best ones
