@@ -1,23 +1,18 @@
 import random
 import tkinter as tk
 from collections import Counter
-from tkinter import messagebox  # for pop-ups
+from tkinter import messagebox
 
-# Constants for the game
 COLORS = ["Red", "Blue", "Green", "Yellow", "Black", "White"]
-TARGET_LENGTH = 4  # between 1 and 6
-POPULATION_SIZE = 8  # between 4 and 11 (to be lisible)
 MUTATION_RATE = 0.1
 EXACT_MATCH = 1
 PARTIAL_MATCH = 0.5
 
 
-# Function to generate a random combination
-def generate_combination():
-    return [random.choice(COLORS) for _ in range(TARGET_LENGTH)]
+def generate_combination(length):
+    return [random.choice(COLORS) for _ in range(length)]
 
 
-# Advanced score
 def score_combination(combination, target):
     exact_match, partial_match = 0, 0
     remaining_colors, remaining_target = [], []
@@ -38,14 +33,12 @@ def score_combination(combination, target):
     return exact_match * EXACT_MATCH + partial_match * PARTIAL_MATCH
 
 
-# Function to perform crossover between two parents
-def crossover(parent1, parent2):
-    return [random.choice([parent1[i], parent2[i]]) for i in range(TARGET_LENGTH)]
+def crossover(parent1, parent2, length):
+    return [random.choice([parent1[i], parent2[i]]) for i in range(length)]
 
 
-# Function to mutate a combination
-def mutate(combination):
-    index_to_mutate = random.randint(0, TARGET_LENGTH - 1)
+def mutate(combination, length):
+    index_to_mutate = random.randint(0, length - 1)
     new_color = random.choice(
         [color for color in COLORS if color != combination[index_to_mutate]]
     )
@@ -53,50 +46,109 @@ def mutate(combination):
     return combination
 
 
-# GUI class for displaying the algorithm process
-class MastermindGUI:
-    def __init__(self, root):
+class StartScreen:
+    def __init__(self, root, start_callback):
         self.root = root
         self.root.title("Mastermind Genetic Algorithm")
-        self.root.geometry("1500x1000")  # Increased window size
+        self.root.geometry("1000x350")
+        self.start_callback = start_callback
 
-        # Initialize variables
-        self.target_combination = generate_combination()
-        self.population = [generate_combination() for _ in range(POPULATION_SIZE)]
+        self.target_length = tk.IntVar(value=4)  # default value is 4
+        self.population_size = tk.IntVar(value=8)  # default value is 8
+
+        tk.Label(root, text="Configure the game parameters:", font=("Times", 70)).pack(
+            pady=5
+        )
+
+        self.create_input_field("Target Length (1-6):", self.target_length)
+        self.create_input_field("Population Size (4-11):", self.population_size)
+
+        tk.Button(
+            root,
+            text="Start Game",
+            command=self.start_game,
+            font=("Times", 70),
+            bg="lightgreen",
+        ).pack(pady=20)
+
+    def create_input_field(self, label_text, variable):
+        frame = tk.Frame(self.root)
+        frame.pack(pady=5)
+        tk.Label(frame, text=label_text, font=("Times", 60)).pack(
+            side=tk.LEFT, padx=5, pady=10
+        )
+        tk.Entry(frame, textvariable=variable, font=("Times", 60), width=10).pack(
+            side=tk.LEFT
+        )
+
+    def start_game(self):
+        length = self.target_length.get()
+        size = self.population_size.get()
+
+        if not (1 <= length <= 6 and 4 <= size <= 11):
+            messagebox.showerror("Invalid Input", "Please enter valid values.")
+            return
+
+        self.start_callback(length, size)
+        self.root.destroy()
+
+
+class MastermindGUI:
+    def __init__(self, root, target_length, population_size):
+        self.root = root
+        self.root.title("Mastermind Genetic Algorithm")
+        self.root.geometry("1500x1100")
+
+        # Initialisation
+        self.target_length = target_length
+        self.population_size = population_size
+        self.target_combination = generate_combination(target_length)
+        self.population = [
+            generate_combination(target_length) for _ in range(population_size)
+        ]
         self.generation = 0
         self.found = False
+        self.scored_population = []
 
-        # Frame for UI organization
+        # Building panels
         frame = tk.Frame(root)
         frame.pack()
 
-        # Left pane for population and controls
+        # Left panel
         left_pane = tk.Frame(frame)
         left_pane.pack(side="left")
 
-        # Right pane for secret code
+        # Right panel
         right_pane = tk.Frame(frame, padx=20, pady=20)
         right_pane.pack(side="right")
 
-        # Set up GUI elements in left pane
+        # Canvas
+        self.population_canvas = tk.Canvas(left_pane, width=900, height=800, bg="white")
+        self.population_canvas.pack(pady=10)
+
+        self.secret_code_canvas = tk.Canvas(
+            right_pane, width=400, height=100, bg="white"
+        )
+        self.secret_code_canvas.pack(pady=10)
+
+        # Labels
         self.label_generation = tk.Label(
-            left_pane, text="Generation: 0", font=("Arial", 50), bg="lightgray"
+            left_pane, text="Generation: 0", font=("Times", 60)
         )
         self.label_generation.pack(pady=10)
 
-        self.canvas_width = 900
-        self.canvas_height = 800
-        self.canvas = tk.Canvas(
-            left_pane, width=self.canvas_width, height=self.canvas_height, bg="white"
+        self.label_secret = tk.Label(
+            right_pane, text="Secret Code:", font=("Times", 60)
         )
-        self.canvas.pack(pady=10)
+        self.label_secret.pack(pady=10)
 
+        # Buttons
         self.next_button = tk.Button(
             left_pane,
             text="Next Generation",
             command=self.next_generation,
-            font=("Arial", 50),
-            bg="lightgray",
+            font=("Times", 60),
+            bg="lightgreen",
         )
         self.next_button.pack(pady=10)
 
@@ -104,104 +156,68 @@ class MastermindGUI:
             left_pane,
             text="Run All",
             command=self.run_all_generations,
-            font=("Arial", 50),
-            bg="lightgray",
+            font=("Times", 60),
+            bg="lightblue",
         )
         self.run_all_button.pack(pady=10)
 
-        # Secret code display in right pane
-        self.label_secret = tk.Label(
-            right_pane, text="Secret Code:", font=("Arial", 50), bg="lightgray"
-        )
-        self.label_secret.pack(pady=10)
-
-        self.secret_code_canvas = tk.Canvas(
-            right_pane, width=350, height=100, bg="white"
-        )
-        self.secret_code_canvas.pack(pady=10)
-
-        # Draw secret code
         self.draw_secret_code()
-
-        # Display initial population
         self.draw_population()
 
-    # Right panel
     def draw_secret_code(self):
         self.secret_code_canvas.delete("all")
         for j, color in enumerate(self.target_combination):
             x0, y0 = 30 + j * 50, 30
             x1, y1 = x0 + 40, y0 + 40
-            self.secret_code_canvas.create_oval(
-                x0, y0, x1, y1, fill=color.lower(), outline="black"
-            )
+            self.secret_code_canvas.create_oval(x0, y0, x1, y1, fill=color.lower())
 
-    # Left panel
     def draw_population(self):
-        self.canvas.delete("all")  # Clear the canvas
-
-        # Display each individual in the population
-        for i, combo in enumerate(self.population):
-            for j, color in enumerate(combo):
+        self.population_canvas.delete("all")
+        self.scored_population.clear()
+        for i, combination in enumerate(self.population):
+            for j, color in enumerate(combination):
                 x0, y0 = 50 + j * 100, 50 + i * 70
                 x1, y1 = x0 + 40, y0 + 40
-                self.canvas.create_oval(
-                    x0, y0, x1, y1, fill=color.lower(), outline="black"
-                )
-            score = score_combination(combo, self.target_combination)
-            self.canvas.create_text(
-                800,
-                70 + i * 70,
-                text=f"Score: {score}",
-                font=("Arial", 40),
-                fill="black",
+                self.population_canvas.create_oval(x0, y0, x1, y1, fill=color.lower())
+            score = score_combination(combination, self.target_combination)
+            self.scored_population.append((combination, score))
+            self.population_canvas.create_text(
+                800, 70 + i * 70, text=f"Score: {score}", font=("Times", 40)
             )
 
-        # Update generation label
         self.label_generation.config(text=f"Generation: {self.generation}")
 
     def next_generation(self):
-        # Score each combination
-        scored_population = [
-            (combo, score_combination(combo, self.target_combination))
-            for combo in self.population
-        ]
-
         # Check if any combination matches the target
-        for combo, score in scored_population:
-            if score == TARGET_LENGTH:
+        for combination, score in self.scored_population:
+            if score == self.target_length:
                 self.found = True
                 print(
-                    f"Target combination found: {combo} in generation {self.generation}"
+                    f"Target combination found: {combination} in generation {self.generation}"
                 )
                 self.label_generation.config(
                     text=f"Target found in generation {self.generation}"
                 )
                 self.next_button.config(state="disabled")
                 self.run_all_button.config(state="disabled")
-                messagebox.showinfo(
-                    "Winner",
-                    f"WINNER \n The target was found in generation {self.generation}!",
-                )
+                # messagebox.showinfo(
+                #    "Winner",
+                #    f"WINNER \n The target was found in generation {self.generation}!",
+                # )
                 return
 
-        # Divide population by 2, keeping the best ones
-        scored_population.sort(key=lambda x: x[1], reverse=True)
+        self.scored_population.sort(key=lambda x: x[1], reverse=True)
         survivors = [
-            combo for combo, _ in scored_population[: int(POPULATION_SIZE / 2)]
+            combo for combo, _ in self.scored_population[: self.population_size // 2]
         ]
-
-        # Perform mutation on the weakest of the survivors
         if random.random() < MUTATION_RATE:
-            survivors[-1] = mutate(survivors[-1])
+            survivors[-1] = mutate(survivors[-1], self.target_length)
 
-        # Perform crossover to create new combinations
         new_population = survivors[:]
-        while len(new_population) < POPULATION_SIZE:
+        while len(new_population) < self.population_size:
             parents = random.sample(survivors, 2)
-            new_population.append(crossover(parents[0], parents[1]))
+            new_population.append(crossover(parents[0], parents[1], self.target_length))
 
-        # Update population and display
         self.population = new_population
         self.generation += 1
         self.draw_population()
@@ -211,8 +227,13 @@ class MastermindGUI:
             self.next_generation()
 
 
-# Main application
 if __name__ == "__main__":
     root = tk.Tk()
-    app = MastermindGUI(root)
+
+    def start_game(target_length, population_size):
+        main_window = tk.Tk()
+        MastermindGUI(main_window, target_length, population_size)
+        main_window.mainloop()
+
+    StartScreen(root, start_game)
     root.mainloop()
