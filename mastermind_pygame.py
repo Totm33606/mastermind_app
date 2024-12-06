@@ -4,7 +4,7 @@ from collections import Counter
 
 # Constants
 COLORS = ["Red", "Blue", "Green", "Yellow", "Black", "White"]
-MUTATION_RATE = 0.1
+MUTATION_RATE = 0.8
 EXACT_MATCH = 1
 PARTIAL_MATCH = 0.5
 SCREEN_WIDTH = 1500
@@ -31,7 +31,7 @@ population_size_input = ""
 def generate_combination(length):
     return [random.choice(COLORS) for _ in range(length)]
 
-def score_combination(combination, target):
+def score_combination(combination, target, exact_only=False):
     exact_match, partial_match = 0, 0
     remaining_colors, remaining_target = [], []
 
@@ -42,13 +42,16 @@ def score_combination(combination, target):
             remaining_colors.append(comb_color)
             remaining_target.append(target_color)
 
-    target_counts = Counter(remaining_target)
-    for color in remaining_colors:
-        if target_counts[color] > 0:
-            partial_match += 1
-            target_counts[color] -= 1
-
-    return exact_match * EXACT_MATCH + partial_match * PARTIAL_MATCH
+    if exact_only:
+        score = exact_match * EXACT_MATCH
+    else:
+        target_counts = Counter(remaining_target)
+        for color in remaining_colors:
+            if target_counts[color] > 0:
+                partial_match += 1
+                target_counts[color] -= 1
+        score = exact_match * EXACT_MATCH + partial_match * PARTIAL_MATCH
+    return score
 
 def crossover(parent1, parent2, length):
     return [random.choice([parent1[i], parent2[i]]) for i in range(length)]
@@ -63,7 +66,7 @@ class StartScreen:
     def __init__(self):
         self.target_length = 4
         self.population_size = 8
-        self.running = True
+        self.show_secret_code = True 
         self.input_active_target_length = False
         self.input_active_population_size = False
         self.target_length_input = str(self.target_length)
@@ -77,27 +80,39 @@ class StartScreen:
         screen.blit(text_surface, (x + 10, y + 10))
     
     def draw_button(self, x, y, text, font, bg_color, text_color, border_color, padding=20, hover=False):
-        # Rendu du texte
         text_surface = font.render(text, True, text_color)
         text_width, text_height = text_surface.get_size()
         button_width = text_width + padding * 2
         button_height = text_height + padding
 
         final_bg_color = tuple(min(c + 40, 255) for c in bg_color) if hover else bg_color
-        pygame.draw.rect(screen, final_bg_color, (x, y, button_width, button_height), border_radius=10) # Fond 
-        pygame.draw.rect(screen, border_color, (x, y, button_width, button_height), width=3, border_radius=10) # Bordure
+        pygame.draw.rect(screen, final_bg_color, (x, y, button_width, button_height), border_radius=10)  # Fond 
+        pygame.draw.rect(screen, border_color, (x, y, button_width, button_height), width=3, border_radius=10)  # Bordure
 
-        # Positionnement du texte pour le centrer dans le bouton
         text_x = x + (button_width - text_width) // 2
         text_y = y + (button_height - text_height) // 2
         screen.blit(text_surface, (text_x, text_y))
-
-        # Retourne un objet Rect pour détecter les clics
         return pygame.Rect(x, y, button_width, button_height)
 
+    def draw_checkbox(self, x, y, text, checked):
+        text_surface = font_medium.render(text, True, (0, 0, 0))
+        text_width, _ = text_surface.get_size()
+        screen.blit(text_surface, (x, y + 2))
+        box_size = 40
+        box_x = x + text_width + 10
+        box_y = y
+        pygame.draw.rect(screen, (0, 0, 0), (box_x, box_y, box_size, box_size), 2)
+
+        # Dessin du "tick" si la case est cochée (plus épais)
+        if checked:
+            pygame.draw.line(screen, (0, 0, 0), (box_x + 5, box_y + box_size // 2), (box_x + 8, box_y + box_size - 5), 2)
+            pygame.draw.line(screen, (0, 0, 0), (box_x + 8, box_y + box_size - 5), (box_x + box_size - 5, box_y + 5), 2)
+
+        return pygame.Rect(box_x, box_y, box_size, box_size)
 
     def show(self):
-        while self.running:
+        running = True
+        while running:
             screen.fill((240, 248, 255))  # Fond bleu clair (AliceBlue)
 
             # Titre
@@ -105,8 +120,8 @@ class StartScreen:
             screen.blit(title_text, (SCREEN_WIDTH // 2 - title_text.get_width() // 2, 50))
 
             # Labels et champs de saisie
-            label_x = SCREEN_WIDTH // 2 - 10
-            input_x = SCREEN_WIDTH // 2
+            label_x = SCREEN_WIDTH // 2 + 10
+            input_x = SCREEN_WIDTH // 2 + 20
             input_width = 150
 
             # Target Length
@@ -119,12 +134,15 @@ class StartScreen:
             screen.blit(population_label, (label_x - population_label.get_width(), 260))
             self.draw_input_field(input_x, 260, input_width, self.population_size_input, self.input_active_population_size)
 
+            # Case à cocher pour afficher/cacher le code secret
+            checkbox = self.draw_checkbox(SCREEN_WIDTH // 2 - 180, 325, "Show Secret Code", self.show_secret_code)
+
             # Bouton Start Game
             mouse_pos = pygame.mouse.get_pos()
-            start_hover = SCREEN_WIDTH // 2 - 100 < mouse_pos[0] < SCREEN_WIDTH // 2 + 100 and 350 < mouse_pos[1] < 420
+            start_hover = SCREEN_WIDTH // 2 - 100 < mouse_pos[0] < SCREEN_WIDTH // 2 + 100 and 400 < mouse_pos[1] < 470
             start_button = self.draw_button(
                 x=SCREEN_WIDTH // 2 - 100,
-                y=350,
+                y=400,
                 text="Start Game",
                 font=font_medium,
                 bg_color=(0, 255, 0),         # Couleur verte
@@ -139,11 +157,13 @@ class StartScreen:
             # Gérer les événements
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
-                    self.running = False
+                    running = False
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     if start_button.collidepoint(event.pos):
                         self.start_game()
                         return
+                    elif checkbox.collidepoint(event.pos):
+                        self.show_secret_code = not self.show_secret_code  # Inverser l'état de la case à cocher
                     elif input_x < event.pos[0] < input_x + input_width and 180 < event.pos[1] < 220:
                         self.input_active_target_length = True
                         self.input_active_population_size = False
@@ -174,13 +194,16 @@ class StartScreen:
             target_length = self.target_length
             population_size = self.population_size
 
-        game = MastermindGame(target_length, population_size)
+        # Passer le paramètre show_secret_code au jeu
+        game = MastermindGame(target_length, population_size, show_secret_code=self.show_secret_code)
         game.run_game()
 
+
 class MastermindGame:
-    def __init__(self, target_length, population_size):
+    def __init__(self, target_length, population_size, show_secret_code=True):
         self.target_length = target_length
         self.population_size = population_size
+        self.show_secret_code = show_secret_code
         self.target_combination = generate_combination(target_length)
         self.population = [generate_combination(target_length) for _ in range(population_size)]
         self.generation = 0
@@ -208,7 +231,7 @@ class MastermindGame:
                 pygame.draw.circle(screen, self.get_color_from_name(color), (100 + j * 80, y_offset + i * 70), 20)  # Cercle colorÃ©, rayon 20
 
             # Afficher le score de chaque combinaison
-            score = score_combination(combination, self.target_combination)
+            score = score_combination(combination, self.target_combination, exact_only=True)
             score_text = font_small.render(f"Score: {score}", True, (0, 0, 0))
             screen.blit(score_text, (650, y_offset + i * 69))
 
@@ -264,7 +287,7 @@ class MastermindGame:
             return
         
         self.generation += 1
-        scored_population = [(combo, score_combination(combo, self.target_combination)) for combo in self.population]
+        scored_population = [(combo, score_combination(combo, self.target_combination, exact_only=True)) for combo in self.population]
         scored_population.sort(key=lambda x: x[1], reverse=True)
         survivors = [combo for combo, _ in scored_population[:self.population_size // 2]]
 
@@ -282,22 +305,21 @@ class MastermindGame:
         running = True
         run_all = False
         self.check_solution() # Si dans la pop init on trouve par miracle le code du 1er coup
-
         while running:
             # Dessiner le fond dégradé
             self.draw_gradient_background(screen, (135, 206, 250), (25, 25, 112))  # Bleu ciel vers bleu nuit
 
-            # Dessiner le reste de l'interface
-            self.draw_secret_code()
+            if self.show_secret_code:
+                 # Affichage de 'Secret Code'
+                self.draw_secret_code()
+                secret_text = font_medium.render("Secret code:", True, (0, 0, 0))
+                screen.blit(secret_text, (SCREEN_WIDTH - 375 - secret_text.get_width() // 2, 25))
+
             self.draw_population()
 
             # Affichage de la génération
             generation_text = font_medium.render(f"Generation: {self.generation}", True, (0, 0, 0))
             screen.blit(generation_text, (SCREEN_WIDTH // 2 - generation_text.get_width() // 2, 25))
-
-            # Affichage de 'Secret Code'
-            secret_text = font_medium.render("Secret code:", True, (0, 0, 0))
-            screen.blit(secret_text, (SCREEN_WIDTH - 375 - secret_text.get_width() // 2, 25))
 
             # Coordonnées des boutons
             button_y = SCREEN_HEIGHT - 50
