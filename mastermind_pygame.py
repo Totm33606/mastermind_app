@@ -66,7 +66,8 @@ class StartScreen:
     def __init__(self):
         self.target_length = 4
         self.population_size = 8
-        self.show_secret_code = True 
+        self.show_secret_code = True
+        self.show_best = True  
         self.input_active_target_length = False
         self.input_active_population_size = False
         self.target_length_input = str(self.target_length)
@@ -116,7 +117,7 @@ class StartScreen:
             screen.fill((240, 248, 255))  # Fond bleu clair (AliceBlue)
 
             # Titre
-            title_text = font_large.render("Mastermind Genetic Algorithm", True, (25, 25, 112))
+            title_text = font_large.render("Mastermind Genetic Algorithm", True, (86, 180, 233))
             screen.blit(title_text, (SCREEN_WIDTH // 2 - title_text.get_width() // 2, 50))
 
             # Labels et champs de saisie
@@ -135,17 +136,21 @@ class StartScreen:
             self.draw_input_field(input_x, 260, input_width, self.population_size_input, self.input_active_population_size)
 
             # Case à cocher pour afficher/cacher le code secret
-            checkbox = self.draw_checkbox(SCREEN_WIDTH // 2 - 180, 325, "Show Secret Code", self.show_secret_code)
+            checkbox_show_secret = self.draw_checkbox(SCREEN_WIDTH // 2 - 180, 325, "Show Secret Code", self.show_secret_code)
+            
+            # Case à cocher pour afficher ou non les meilleurs scores
+            checkbox_show_best = self.draw_checkbox(SCREEN_WIDTH // 2 - 180, 400, "Show Best codes", self.show_best)
+
 
             # Bouton Start Game
             mouse_pos = pygame.mouse.get_pos()
             start_hover = SCREEN_WIDTH // 2 - 100 < mouse_pos[0] < SCREEN_WIDTH // 2 + 100 and 400 < mouse_pos[1] < 470
             start_button = self.draw_button(
                 x=SCREEN_WIDTH // 2 - 100,
-                y=400,
+                y=500,
                 text="Start Game",
                 font=font_medium,
-                bg_color=(0, 255, 0),         # Couleur verte
+                bg_color=(0, 158, 115),         # Couleur verte
                 text_color=(0, 0, 0),         # Texte noir
                 border_color=(0, 0, 0),       # Bordure noire
                 padding=20,
@@ -162,8 +167,10 @@ class StartScreen:
                     if start_button.collidepoint(event.pos):
                         self.start_game()
                         return
-                    elif checkbox.collidepoint(event.pos):
+                    elif checkbox_show_secret.collidepoint(event.pos):
                         self.show_secret_code = not self.show_secret_code  # Inverser l'état de la case à cocher
+                    elif checkbox_show_best.collidepoint(event.pos):
+                        self.show_best= not self.show_best 
                     elif input_x < event.pos[0] < input_x + input_width and 180 < event.pos[1] < 220:
                         self.input_active_target_length = True
                         self.input_active_population_size = False
@@ -195,26 +202,31 @@ class StartScreen:
             population_size = self.population_size
 
         # Passer le paramètre show_secret_code au jeu
-        game = MastermindGame(target_length, population_size, show_secret_code=self.show_secret_code)
+        game = MastermindGame(target_length, population_size, show_secret_code=self.show_secret_code, show_best=self.show_best)
         game.run_game()
 
 
 class MastermindGame:
-    def __init__(self, target_length, population_size, show_secret_code=True):
+    def __init__(self, target_length, population_size, show_secret_code=True, show_best=True):
         self.target_length = target_length
         self.population_size = population_size
         self.show_secret_code = show_secret_code
+        self.show_best = show_best
         self.target_combination = generate_combination(target_length)
         self.population = [generate_combination(target_length) for _ in range(population_size)]
+        scored_population = [(combo, score_combination(combo, self.target_combination, exact_only=True)) for combo in self.population]
+        scored_population.sort(key=lambda x: x[1], reverse=True)
+        self.survivors = [combo for combo, _ in scored_population[:self.population_size // 2]]
         self.generation = 0
         self.found = False
+        self.secrets_found = []
     
     def get_color_from_name(self, color_name):
         color_map = {
-            "Red": (255, 0, 0),
-            "Blue": (0, 0, 255),
-            "Green": (0, 255, 0),
-            "Yellow": (255, 255, 0),
+            "Red": (230, 159, 0),
+            "Blue": (86, 180, 233),
+            "Green": (0, 158, 115),
+            "Yellow": (240, 228, 66),
             "Black": (0, 0, 0),
             "White": (255, 255, 255)
         }
@@ -234,6 +246,9 @@ class MastermindGame:
             score = score_combination(combination, self.target_combination, exact_only=True)
             score_text = font_small.render(f"Score: {score}", True, (0, 0, 0))
             screen.blit(score_text, (650, y_offset + i * 69))
+
+            if self.show_best and combination in self.survivors:
+                pygame.draw.rect(screen, (0, 0, 0), (75, y_offset + i * 70 - 25, 560, 50), 4, border_radius=5)
 
     def draw_secret_code(self):
         for i, color in enumerate(self.target_combination):
@@ -268,19 +283,68 @@ class MastermindGame:
         text_y = y + (button_height - text_height) // 2
         screen.blit(text_surface, (text_x, text_y))
         return pygame.Rect(x, y, button_width, button_height)
+    
+    def draw_histogram(self):
+        if len(self.secrets_found) > 10:
+            temp = self.secrets_found[-1]
+            del self.secrets_found
+            self.secrets_found = [temp]
+            
+        # Dimensions et position de l'histogramme
+        histogram_width = 500
+        histogram_height = 200
+        histogram_x = 900
+        histogram_y = SCREEN_HEIGHT - histogram_height - 200
+
+        # Calcul des échelles
+        max_iterations = max(self.secrets_found) if self.secrets_found else 1
+        bar_width = histogram_width / 10
+        scale = histogram_height / max_iterations
+
+        # Dessiner le fond de l'histogramme
+        pygame.draw.rect(screen, (240, 240, 240), (histogram_x, histogram_y, histogram_width, histogram_height))
+        pygame.draw.rect(screen, (0, 0, 0), (histogram_x, histogram_y, histogram_width, histogram_height), 2)
+
+        # Dessiner les barres
+        for i, iterations in enumerate(self.secrets_found):
+            bar_height = iterations * scale
+            bar_x = histogram_x + i * bar_width
+            bar_y = histogram_y + histogram_height - bar_height
+
+            # Barre 
+            pygame.draw.rect(screen, (86, 180, 233), (bar_x, bar_y, bar_width - 2, bar_height))
+
+            # Bordure
+            pygame.draw.rect(screen, (0, 0, 0), (bar_x, bar_y, bar_width - 2, bar_height), width=2)
+
+            # Affichage nombre de générations
+            value_text = font_small.render(str(iterations), True, (0, 0, 0))  # Texte noir
+            text_x = bar_x + (bar_width - value_text.get_width()) // 2  # Centrer le texte horizontalement
+            text_y = bar_y - value_text.get_height() - 2  # Placer au-dessus de la barre
+            screen.blit(value_text, (text_x, text_y))
 
     def check_solution(self):
         for combination in self.population:
             if combination == self.target_combination:
                 self.found = True
+                self.secrets_found.append(self.generation)
                 break
 
     def reset_game(self):
         # Reset game variables
         self.generation = 0
         self.found = False
+
+        del self.target_combination
         self.target_combination = generate_combination(self.target_length)
+
+        del self.population
         self.population = [generate_combination(self.target_length) for _ in range(self.population_size)]
+
+        del self.survivors
+        scored_population = [(combo, score_combination(combo, self.target_combination, exact_only=True)) for combo in self.population]
+        scored_population.sort(key=lambda x: x[1], reverse=True)
+        self.survivors = [combo for combo, _ in scored_population[:self.population_size // 2]]
 
     def next_generation(self):
         if self.found:
@@ -290,6 +354,8 @@ class MastermindGame:
         scored_population = [(combo, score_combination(combo, self.target_combination, exact_only=True)) for combo in self.population]
         scored_population.sort(key=lambda x: x[1], reverse=True)
         survivors = [combo for combo, _ in scored_population[:self.population_size // 2]]
+        del self.survivors
+        self.survivors = survivors
 
         if random.random() < MUTATION_RATE:
             survivors[-1] = mutate(survivors[-1], self.target_length)
@@ -299,6 +365,7 @@ class MastermindGame:
             parents = random.sample(survivors, 2)
             new_population.append(crossover(parents[0], parents[1], self.target_length))
 
+        del self.population
         self.population = new_population
 
     def run_game(self):
@@ -307,7 +374,7 @@ class MastermindGame:
         self.check_solution() # Si dans la pop init on trouve par miracle le code du 1er coup
         while running:
             # Dessiner le fond dégradé
-            self.draw_gradient_background(screen, (135, 206, 250), (25, 25, 112))  # Bleu ciel vers bleu nuit
+            self.draw_gradient_background(screen, (200, 200, 200), (100, 100, 100))  # Gris clair vers gris foncé
 
             if self.show_secret_code:
                  # Affichage de 'Secret Code'
@@ -316,13 +383,14 @@ class MastermindGame:
                 screen.blit(secret_text, (SCREEN_WIDTH - 375 - secret_text.get_width() // 2, 25))
 
             self.draw_population()
+            self.draw_histogram()
 
             # Affichage de la génération
             generation_text = font_medium.render(f"Generation: {self.generation}", True, (0, 0, 0))
             screen.blit(generation_text, (SCREEN_WIDTH // 2 - generation_text.get_width() // 2, 25))
 
             # Coordonnées des boutons
-            button_y = SCREEN_HEIGHT - 50
+            button_y = SCREEN_HEIGHT - 55
 
             # Boutons interactifs
             mouse_pos = pygame.mouse.get_pos()
@@ -332,13 +400,13 @@ class MastermindGame:
 
             # Dessiner les boutons
             next_gen_button = self.draw_button(
-                20, button_y, "Next Generation", font_small, (0, 255, 0), (0, 0, 0), (0, 200, 0), hover=next_gen_hover
+                20, button_y, "Next Generation", font_medium, (0, 158, 115), (0, 0, 0), (0, 0, 0), hover=next_gen_hover
             )
             run_all_button = self.draw_button(
-                SCREEN_WIDTH - 180, button_y, "Run All", font_medium, (0, 0, 255), (0, 0, 0), (0, 0, 200), hover=run_all_hover
+                SCREEN_WIDTH - 180, button_y, "Run All", font_medium, (86, 180, 233), (0, 0, 0), (0, 0, 0), hover=run_all_hover
             )
             reset_button = self.draw_button(
-                SCREEN_WIDTH // 2 - 100, button_y, "Reset Game", font_medium, (255, 0, 0), (0, 0, 0), (200, 0, 0), hover=reset_hover
+                SCREEN_WIDTH // 2 - 100, button_y, "Reset Game", font_medium, (230, 159, 0), (0, 0, 0), (0, 0, 0), hover=reset_hover
             )
 
             pygame.display.update()
