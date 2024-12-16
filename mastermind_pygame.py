@@ -289,7 +289,7 @@ class MastermindGame:
             temp = self.secrets_found[-1]
             del self.secrets_found
             self.secrets_found = [temp]
-            
+
         # Dimensions et position de l'histogramme
         histogram_width = 500
         histogram_height = 200
@@ -325,7 +325,7 @@ class MastermindGame:
 
     def check_solution(self):
         for combination in self.population:
-            if combination == self.target_combination:
+            if combination == self.target_combination and not self.found:
                 self.found = True
                 self.secrets_found.append(self.generation)
                 break
