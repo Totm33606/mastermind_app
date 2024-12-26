@@ -23,12 +23,6 @@ font_large = pygame.font.Font(None, 70)
 font_medium = pygame.font.Font(None, 50)
 font_small = pygame.font.Font(None, 40)
 
-# Input fields for parameters
-input_active_target_length = False
-input_active_population_size = False
-target_length_input = ""
-population_size_input = ""
-
 
 def generate_combination(length):
     return [random.choice(COLORS) for _ in range(length)]
