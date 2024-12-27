@@ -1,13 +1,38 @@
+"""
+Mastermind Genetic Algorithm Game using Pygame
+
+This code contains the various modules needed to run the mastermind game.
+The game is solved for a set of adjustable parameters. The main aim of this game
+is to introduce students to genetic algorithms and artificial intelligence.
+
+Authors:
+- Thomas CHAMBON (t_chambo@insa-toulouse.fr)
+- Adam MEDBOUHI (medbouhi@insa-toulouse.fr)
+
+Date: 01/01/2025
+
+This code is part of an educational project aimed at exploring genetic algorithms
+through an interactive Mastermind game.
+"""
+
+##---IMPORTS---##
+##-------------##
 import pygame
 import random
 from collections import Counter
 import heapq
 
-# Constants
+##---CONSTANTS VARIABLES AND INIT---##
+##----------------------------------##
 COLORS = ["Red", "Blue", "Green", "Yellow", "Black", "White"]
-MUTATION_RATE = 0.8
 EXACT_MATCH = 1
 PARTIAL_MATCH = 0.5
+MIN_TARGET_LENGTH = 1
+MAX_TARGET_LENGTH = 7
+MIN_POPULATION_SIZE = 4
+MAX_POPULATION_SIZE = 10
+MIN_MUTATION_RATE = 0.0
+MAX_MUTATION_RATE = 1.0
 SCREEN_WIDTH = 1500
 SCREEN_HEIGHT = 800
 
@@ -24,6 +49,8 @@ font_medium = pygame.font.Font(None, 50)
 font_small = pygame.font.Font(None, 40)
 
 
+##---GENERIC FUNCTIONS---##
+##-----------------------##
 def generate_combination(length):
     return [random.choice(COLORS) for _ in range(length)]
 
@@ -51,7 +78,7 @@ def score_combination(combination, target, exact_only=True):
     return score
 
 
-def calculate_population_scores(population, target, scoring_function=score_combination):
+def score_population(population, target, scoring_function=score_combination):
     return {
         index: scoring_function(combination, target)
         for index, combination in population.items()
@@ -79,100 +106,153 @@ def mutate(combination, length):
     return combination
 
 
+##---START SCREEN---##
+##------------------##
 class StartScreen:
     def __init__(self):
-        self.target_length = 4
-        self.population_size = 8
-        self.mutation_rate = MUTATION_RATE
+        self.settings = {
+            "target_length": {"value": 4, "active": False, "input": "4"},
+            "population_size": {"value": 8, "active": False, "input": "8"},
+            "mutation_rate": {"value": 0.8, "active": False, "input": "0.8"},
+        }
         self.show_secret_code = True
         self.show_best = True
-        self.input_active_target_length = False
-        self.input_active_population_size = False
-        self.input_active_mutation_rate = False
-        self.target_length_input = str(self.target_length)
-        self.population_size_input = str(self.population_size)
-        self.mutation_rate_input = str(self.mutation_rate)
 
-    def draw_input_field(self, x, y, width, text, active):
-        color = (0, 0, 0) if not active else (255, 0, 0)
+    def draw_input_field(self, x, y, width, key):
+        field = self.settings[key]
+        color = (0, 0, 0) if not field["active"] else (255, 0, 0)
         pygame.draw.rect(screen, (255, 255, 255), (x, y, width, 40), border_radius=10)
         pygame.draw.rect(screen, color, (x, y, width, 40), 2, border_radius=10)
-        text_surface = font_small.render(text, True, (0, 0, 0))
+        text_surface = font_small.render(field["input"], True, (0, 0, 0))
         screen.blit(text_surface, (x + 10, y + 10))
 
     def draw_button(
-        self,
-        x,
-        y,
-        text,
-        font,
-        bg_color,
-        text_color,
-        border_color,
-        padding=20,
-        hover=False,
+        self, x, y, text, font, bg_color, text_color, border_color, hover=False
     ):
         text_surface = font.render(text, True, text_color)
         text_width, text_height = text_surface.get_size()
-        button_width = text_width + padding * 2
-        button_height = text_height + padding
-
+        button_width = text_width + 40
+        button_height = text_height + 20
         final_bg_color = (
             tuple(min(c + 40, 255) for c in bg_color) if hover else bg_color
         )
+
         pygame.draw.rect(
             screen,
             final_bg_color,
             (x, y, button_width, button_height),
             border_radius=10,
-        )  # Fond
+        )
         pygame.draw.rect(
             screen,
             border_color,
             (x, y, button_width, button_height),
-            width=3,
+            3,
             border_radius=10,
-        )  # Bordure
+        )
 
-        text_x = x + (button_width - text_width) // 2
-        text_y = y + (button_height - text_height) // 2
-        screen.blit(text_surface, (text_x, text_y))
+        screen.blit(
+            text_surface,
+            (
+                x + (button_width - text_width) // 2,
+                y + (button_height - text_height) // 2,
+            ),
+        )
         return pygame.Rect(x, y, button_width, button_height)
 
     def draw_checkbox(self, x, y, text, checked):
         text_surface = font_medium.render(text, True, (0, 0, 0))
-        text_width, _ = text_surface.get_size()
         screen.blit(text_surface, (x, y + 2))
         box_size = 40
-        box_x = x + text_width + 10
-        box_y = y
-        pygame.draw.rect(screen, (0, 0, 0), (box_x, box_y, box_size, box_size), 2)
+        box_x = x + text_surface.get_width() + 10
+        pygame.draw.rect(screen, (0, 0, 0), (box_x, y, box_size, box_size), 2)
 
-        # Dessin du "tick" si la case est cochée (plus épais)
         if checked:
             pygame.draw.line(
-                screen,
-                (0, 0, 0),
-                (box_x + 5, box_y + box_size // 2),
-                (box_x + 8, box_y + box_size - 5),
-                2,
+                screen, (0, 0, 0), (box_x + 5, y + 20), (box_x + 15, y + 35), 3
             )
             pygame.draw.line(
-                screen,
-                (0, 0, 0),
-                (box_x + 8, box_y + box_size - 5),
-                (box_x + box_size - 5, box_y + 5),
-                2,
+                screen, (0, 0, 0), (box_x + 15, y + 35), (box_x + 35, y + 5), 3
             )
 
-        return pygame.Rect(box_x, box_y, box_size, box_size)
+        return pygame.Rect(box_x, y, box_size, box_size)
+
+    def handle_events(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            mouse_pos = pygame.mouse.get_pos()
+            for key, field in self.settings.items():
+                if field["rect"].collidepoint(mouse_pos):
+                    self.activate_field(key)
+            if self.checkbox_secret_rect.collidepoint(mouse_pos):
+                self.show_secret_code = not self.show_secret_code
+            if self.checkbox_best_rect.collidepoint(mouse_pos):
+                self.show_best = not self.show_best
+            if self.start_button_rect.collidepoint(mouse_pos):
+                self.start_game()
+        elif event.type == pygame.KEYDOWN:
+            for key, field in self.settings.items():
+                if field["active"]:
+                    if event.key == pygame.K_BACKSPACE:
+                        field["input"] = field["input"][:-1]
+                    elif event.key == pygame.K_RETURN:
+                        field["active"] = False
+                        self.apply_field_value(key)
+                    else:
+                        field["input"] += event.unicode
+
+    def activate_field(self, key):
+        for field_key in self.settings.keys():
+            self.settings[field_key]["active"] = field_key == key
+
+    def apply_field_value(self, key):
+        try:
+            if key == "mutation_rate":
+                self.settings[key]["value"] = float(self.settings[key]["input"])
+            else:
+                self.settings[key]["value"] = int(self.settings[key]["input"])
+        except ValueError:
+            self.settings[key]["input"] = str(self.settings[key]["value"])
+
+    def validate_value(self, key, value):
+        if key == "target_length":
+            return max(MIN_TARGET_LENGTH, min(MAX_TARGET_LENGTH, value))
+        elif key == "population_size":
+            return max(MIN_POPULATION_SIZE, min(MAX_POPULATION_SIZE, value))
+        elif key == "mutation_rate":
+            return max(MIN_MUTATION_RATE, min(MAX_MUTATION_RATE, value))
+        return value
+
+    def start_game(self):
+        try:
+            target_length = self.validate_value(
+                "target_length", int(self.settings["target_length"]["input"])
+            )
+            population_size = self.validate_value(
+                "population_size", int(self.settings["population_size"]["input"])
+            )
+            mutation_rate = self.validate_value(
+                "mutation_rate", float(self.settings["mutation_rate"]["input"])
+            )
+        except ValueError:
+            # Fallback to the last valid settings in case of unexpected issues
+            target_length = self.settings["target_length"]["value"]
+            population_size = self.settings["population_size"]["value"]
+            mutation_rate = self.settings["mutation_rate"]["value"]
+
+        # Launch the game with validated settings
+        game = MastermindGame(
+            target_length=target_length,
+            population_size=population_size,
+            mutation_rate=mutation_rate,
+            show_secret_code=self.show_secret_code,
+            show_best=self.show_best,
+        )
+        game.run_game()
 
     def show(self):
         running = True
         while running:
-            screen.fill((240, 248, 255))  # Fond bleu clair (AliceBlue)
-
-            # Titre
+            screen.fill((240, 248, 255))  # AliceBlue background
             title_text = font_large.render(
                 "Mastermind Genetic Algorithm", True, (86, 180, 233)
             )
@@ -180,192 +260,61 @@ class StartScreen:
                 title_text, (SCREEN_WIDTH // 2 - title_text.get_width() // 2, 50)
             )
 
-            # Labels et champs de saisie
-            label_x = SCREEN_WIDTH // 2 + 10
-            input_x = SCREEN_WIDTH // 2 + 20
-            input_width = 150
+            y_offset = 180
+            for key, label, label_x in [
+                ("target_length", "Target Length", 240),
+                ("population_size", "Population Size", 275),
+                ("mutation_rate", "Mutation Rate", 240),
+            ]:
+                label_surface = font_medium.render(label, True, (0, 0, 0))
+                label_x = SCREEN_WIDTH // 2 - label_x
+                input_x = SCREEN_WIDTH // 2
+                screen.blit(label_surface, (label_x, y_offset))
+                self.settings[key]["rect"] = pygame.Rect(input_x, y_offset, 150, 40)
+                self.draw_input_field(input_x, y_offset, 150, key)
+                y_offset += 80
 
-            # Target Length
-            target_label = font_medium.render("Target Length", True, (0, 0, 0))
-            screen.blit(target_label, (label_x - target_label.get_width(), 180))
-            self.draw_input_field(
-                input_x,
-                180,
-                input_width,
-                self.target_length_input,
-                self.input_active_target_length,
-            )
-
-            # Population Size
-            population_label = font_medium.render("Population Size", True, (0, 0, 0))
-            screen.blit(population_label, (label_x - population_label.get_width(), 260))
-            self.draw_input_field(
-                input_x,
-                260,
-                input_width,
-                self.population_size_input,
-                self.input_active_population_size,
-            )
-
-            # Mutation Rate
-            mutation_label = font_medium.render("Mutation Rate", True, (0, 0, 0))
-            screen.blit(mutation_label, (label_x - mutation_label.get_width(), 340))
-            self.draw_input_field(
-                input_x,
-                340,
-                input_width,
-                self.mutation_rate_input,
-                self.input_active_mutation_rate,
-            )
-
-            # Case à cocher pour afficher/cacher le code secret
-            checkbox_show_secret = self.draw_checkbox(
+            # Checkboxes
+            self.checkbox_secret_rect = self.draw_checkbox(
                 SCREEN_WIDTH // 2 - 180, 405, "Show Secret Code", self.show_secret_code
             )
-
-            # Case à cocher pour afficher ou non les meilleurs scores
-            checkbox_show_best = self.draw_checkbox(
-                SCREEN_WIDTH // 2 - 180, 480, "Show Best codes", self.show_best
+            self.checkbox_best_rect = self.draw_checkbox(
+                SCREEN_WIDTH // 2 - 180, 480, "Show Best Codes", self.show_best
             )
 
-            # Bouton Start Game
+            # Start Button
             mouse_pos = pygame.mouse.get_pos()
-            start_hover = (
-                SCREEN_WIDTH // 2 - 100 < mouse_pos[0] < SCREEN_WIDTH // 2 + 100
-                and 400 < mouse_pos[1] < 470
-            )
-            start_button = self.draw_button(
-                x=SCREEN_WIDTH // 2 - 100,
-                y=700,
-                text="Start Game",
-                font=font_medium,
-                bg_color=(0, 158, 115),  # Couleur verte
-                text_color=(0, 0, 0),  # Texte noir
-                border_color=(0, 0, 0),  # Bordure noire
-                padding=20,
+            start_hover = pygame.Rect(
+                SCREEN_WIDTH // 2 - 100, 700, 200, 60
+            ).collidepoint(mouse_pos)
+            self.start_button_rect = self.draw_button(
+                SCREEN_WIDTH // 2 - 100,
+                700,
+                "Start Game",
+                font_medium,
+                (0, 158, 115),
+                (0, 0, 0),
+                (0, 0, 0),
                 hover=start_hover,
             )
 
             pygame.display.update()
-
-            # Gérer les événements (pourrait etre ameliore)
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
-                elif event.type == pygame.MOUSEBUTTONDOWN:
-                    if start_button.collidepoint(event.pos):
-                        self.start_game()
-                        return
-                    elif checkbox_show_secret.collidepoint(event.pos):
-                        self.show_secret_code = (
-                            not self.show_secret_code
-                        )  # Inverser l'état de la case à cocher
-                    elif checkbox_show_best.collidepoint(event.pos):
-                        self.show_best = not self.show_best
-                    elif (
-                        input_x < event.pos[0] < input_x + input_width
-                        and 180 < event.pos[1] < 220
-                    ):
-                        self.input_active_target_length = True
-                        self.input_active_population_size = False
-                        self.input_active_mutation_rate = False
-                    elif (
-                        input_x < event.pos[0] < input_x + input_width
-                        and 260 < event.pos[1] < 300
-                    ):
-                        self.input_active_population_size = True
-                        self.input_active_target_length = False
-                        self.input_active_mutation_rate = False
-                    elif (
-                        input_x < event.pos[0] < input_x + input_width
-                        and 340 < event.pos[1] < 380
-                    ):
-                        self.input_active_mutation_rate = True
-                        self.input_active_target_length = False
-                        self.input_active_population_size = False
-                elif event.type == pygame.KEYDOWN:
-                    if self.input_active_target_length:
-                        if event.key == pygame.K_BACKSPACE:
-                            self.target_length_input = self.target_length_input[:-1]
-                        elif event.key == pygame.K_RETURN:
-                            self.input_active_target_length = False
-                        else:
-                            self.target_length_input += event.unicode
-                    elif self.input_active_population_size:
-                        if event.key == pygame.K_BACKSPACE:
-                            self.population_size_input = self.population_size_input[:-1]
-                        elif event.key == pygame.K_RETURN:
-                            self.input_active_population_size = False
-                        else:
-                            self.population_size_input += event.unicode
-                    elif self.input_active_mutation_rate:
-                        if event.key == pygame.K_BACKSPACE:
-                            self.mutation_rate_input = self.mutation_rate_input[:-1]
-                        elif event.key == pygame.K_RETURN:
-                            self.input_active_mutation_rate = False
-                        else:
-                            self.mutation_rate_input += event.unicode
-
-    def start_game(self):
-        try:
-            # Récupérer la longueur du code secret
-            target_length = (
-                int(self.target_length_input)
-                if self.target_length_input
-                else self.target_length
-            )
-
-            # Récupérer la taille de la population
-            population_size = (
-                int(self.population_size_input)
-                if self.population_size_input
-                else self.population_size
-            )
-
-            # Récupérer valeur mutation rate
-            mutation_rate = (
-                float(self.mutation_rate_input)
-                if self.mutation_rate_input
-                else self.mutation_rate
-            )
-
-            # Appliquer les limites pour target_length
-            if target_length < 1 or target_length > 7:
-                target_length = self.target_length
-
-            # Appliquer les limites pour population_size
-            if population_size < 4 or population_size > 10:
-                population_size = self.population_size
-
-            # Appliquer les limites pour mutation_rate
-            if mutation_rate < 0 or mutation_rate > 1:
-                mutation_rate = self.mutation_rate
-
-        except ValueError:
-            # En cas d'erreur, utiliser les valeurs par défaut
-            target_length = self.target_length
-            population_size = self.population_size
-            mutation_rate = self.mutation_rate
-
-        # Passer le paramètre show_secret_code au jeu
-        game = MastermindGame(
-            target_length,
-            population_size,
-            mutation_rate,
-            show_secret_code=self.show_secret_code,
-            show_best=self.show_best,
-        )
-        game.run_game()
+                self.handle_events(event)
 
 
+##---MAIN GAME CLASS---##
+##---------------------##
 class MastermindGame:
     def __init__(
         self,
         target_length,
         population_size,
-        mutation_rate=MUTATION_RATE,
-        show_secret_code=True,
-        show_best=True,
+        mutation_rate,
+        show_secret_code,
+        show_best,
     ):
         self.target_length = target_length
         self.population_size = population_size
@@ -384,9 +333,7 @@ class MastermindGame:
         }
 
         # dict {index: score}
-        self.scores = calculate_population_scores(
-            self.population, self.target_combination
-        )
+        self.scores = score_population(self.population, self.target_combination)
 
         # dict {index: combination}
         self.survivors = get_top_combinations(
@@ -408,25 +355,26 @@ class MastermindGame:
         y_offset = 25
         for idx, combination in self.population.items():
             for j, color in enumerate(combination):
-                # Dessiner un cercle noir pour le contour
+                # Draw a black circle for the outline
                 pygame.draw.circle(
                     screen, (0, 0, 0), (100 + j * 80, y_offset + idx * 70), 22
-                )  # Contour noir, rayon 22
+                )  # Black outline, radius 22
 
-                # Dessiner le cercle
+                # Draw the filled circle
                 pygame.draw.circle(
                     screen,
                     self.get_color_from_name(color),
                     (100 + j * 80, y_offset + idx * 70),
                     20,
-                )  # Cercle rayon 20
+                )  # Filled circle, radius 20
 
-            # Afficher le score de chaque combinaison
+            # Display the score of each combination
             score_text = font_small.render(
                 f"Score: {self.scores[idx]}", True, (0, 0, 0)
             )
             screen.blit(score_text, (650, y_offset + idx * 69))
 
+            # Highlight the best combinations if show_best is True
             if self.show_best and idx in self.survivors.keys():
                 pygame.draw.rect(
                     screen,
@@ -438,10 +386,10 @@ class MastermindGame:
 
     def draw_secret_code(self):
         for i, color in enumerate(self.target_combination):
-            # Dessiner un cercle noir pour le contour
+            # Draw a black circle for the outline
             pygame.draw.circle(
                 screen, (0, 0, 0), (1050 + i * 70, 100), 22
-            )  # Contour noir, rayon 22
+            )  # Black outline, radius 22
             pygame.draw.circle(
                 screen, self.get_color_from_name(color), (1050 + i * 70, 100), 20
             )
@@ -467,15 +415,15 @@ class MastermindGame:
         padding=20,
         hover=False,
     ):
-        # Mesure la taille du texte
+        # Measure the size of the text
         text_surface = font.render(text, True, text_color)
         text_width, text_height = text_surface.get_size()
 
-        # Taille dynamique du bouton
+        # Dynamically size the button
         button_width = text_width + padding * 2
         button_height = text_height + padding
 
-        # Couleur de fond si survol
+        # Background color on hover
         final_bg_color = (
             tuple(min(c + 40, 255) for c in bg_color) if hover else bg_color
         )
@@ -484,16 +432,16 @@ class MastermindGame:
             final_bg_color,
             (x, y, button_width, button_height),
             border_radius=10,
-        )  # Fond
+        )  # Background
         pygame.draw.rect(
             screen,
             border_color,
             (x, y, button_width, button_height),
             width=3,
             border_radius=10,
-        )  # Bordure
+        )  # Border
 
-        # Dessin du texte centré
+        # Draw the centered text
         text_x = x + (button_width - text_width) // 2
         text_y = y + (button_height - text_height) // 2
         screen.blit(text_surface, (text_x, text_y))
@@ -505,18 +453,18 @@ class MastermindGame:
             del self.secrets_found
             self.secrets_found = [temp]
 
-        # Dimensions et position de l'histogramme
+        # Histogram dimensions and position
         histogram_width = 500
         histogram_height = 200
         histogram_x = 900
         histogram_y = SCREEN_HEIGHT - histogram_height - 200
 
-        # Calcul des échelles
+        # Scale calculations
         max_iterations = max(self.secrets_found) if self.secrets_found else 1
         bar_width = histogram_width / 10
         scale = histogram_height / max_iterations
 
-        # Dessiner le fond de l'histogramme
+        # Draw the histogram background
         pygame.draw.rect(
             screen,
             (240, 240, 240),
@@ -529,30 +477,30 @@ class MastermindGame:
             2,
         )
 
-        # Dessiner les barres
+        # Draw the bars
         for i, iterations in enumerate(self.secrets_found):
             bar_height = iterations * scale
             bar_x = histogram_x + i * bar_width
             bar_y = histogram_y + histogram_height - bar_height
 
-            # Barre
+            # Bar
             pygame.draw.rect(
                 screen, (86, 180, 233), (bar_x, bar_y, bar_width - 2, bar_height)
             )
 
-            # Bordure
+            # Border
             pygame.draw.rect(
                 screen, (0, 0, 0), (bar_x, bar_y, bar_width - 2, bar_height), width=2
             )
 
-            # Affichage nombre de générations
+            # Display the number of generations
             value_text = font_small.render(
                 str(iterations), True, (0, 0, 0)
-            )  # Texte noir
+            )  # Black text
             text_x = (
                 bar_x + (bar_width - value_text.get_width()) // 2
-            )  # Centrer le texte horizontalement
-            text_y = bar_y - value_text.get_height() - 2  # Placer au-dessus de la barre
+            )  # Center text horizontally
+            text_y = bar_y - value_text.get_height() - 2  # Place above the bar
             screen.blit(value_text, (text_x, text_y))
 
     def check_solution(self):
@@ -561,7 +509,7 @@ class MastermindGame:
             self.secrets_found.append(self.generation)
 
     def reset_game(self):
-        # Reset des variables
+        # Reset variables
         self.generation = 0
         self.found = False
 
@@ -575,9 +523,7 @@ class MastermindGame:
         }
 
         del self.scores
-        self.scores = calculate_population_scores(
-            self.population, self.target_combination
-        )
+        self.scores = score_population(self.population, self.target_combination)
 
         del self.survivors
         self.survivors = get_top_combinations(
@@ -593,14 +539,14 @@ class MastermindGame:
         del self.population
         self.population = self.survivors
 
-        # Etape de mutation
+        # Mutation step
         if random.random() < self.mutation_rate:
             random_index = random.choice(list(self.population.keys()))
             self.population[random_index] = mutate(
                 self.population[random_index], self.target_length
             )
 
-        # Completion de la population
+        # Fill up the population
         survivors = list(self.population.values())
         missing_idx = list(
             set(range(1, self.population_size + 1)) - set(self.population.keys())
@@ -616,13 +562,11 @@ class MastermindGame:
             )
             idx_count += 1
 
-        # Calcul des nouveaux scores
+        # Calculate new scores
         del self.scores
-        self.scores = calculate_population_scores(
-            self.population, self.target_combination
-        )
+        self.scores = score_population(self.population, self.target_combination)
 
-        # Calcul des nouveaux survivants
+        # Determine new survivors
         del self.survivors
         self.survivors = get_top_combinations(
             self.population, self.scores, self.population_size // 2
@@ -631,15 +575,15 @@ class MastermindGame:
     def run_game(self):
         running = True
         run_all = False
-        self.check_solution()  # Si dans la pop init on trouve par miracle le code du 1er coup
+        self.check_solution()  # If the initial population contains the solution
         while running:
-            # Dessiner le fond dégradé
+            # Draw gradient background
             self.draw_gradient_background(
                 screen, (200, 200, 200), (100, 100, 100)
-            )  # Gris clair vers gris foncé
+            )  # Light gray to dark gray
 
             if self.show_secret_code:
-                # Affichage de 'Secret Code'
+                # Display 'Secret Code'
                 self.draw_secret_code()
                 secret_text = font_medium.render("Secret code:", True, (0, 0, 0))
                 screen.blit(
@@ -649,7 +593,7 @@ class MastermindGame:
             self.draw_population()
             self.draw_histogram()
 
-            # Affichage de la génération
+            # Display generation number
             generation_text = font_medium.render(
                 f"Generation: {self.generation}", True, (0, 0, 0)
             )
@@ -658,10 +602,10 @@ class MastermindGame:
                 (SCREEN_WIDTH // 2 - generation_text.get_width() // 2, 25),
             )
 
-            # Coordonnées des boutons
+            # Button coordinates
             button_y = SCREEN_HEIGHT - 55
 
-            # Boutons interactifs
+            # Interactive buttons
             mouse_pos = pygame.mouse.get_pos()
             next_gen_hover = (
                 0 < mouse_pos[0] < 180 and button_y < mouse_pos[1] < button_y + 70
@@ -675,7 +619,7 @@ class MastermindGame:
                 and button_y < mouse_pos[1] < button_y + 70
             )
 
-            # Dessiner les boutons
+            # Draw buttons
             next_gen_button = self.draw_button(
                 20,
                 button_y,
@@ -713,20 +657,20 @@ class MastermindGame:
                 if event.type == pygame.QUIT:
                     running = False
                 elif event.type == pygame.MOUSEBUTTONDOWN:
-                    # Clic sur le bouton Next Generation
+                    # Click on "Next Generation"
                     if next_gen_button.collidepoint(event.pos):
                         self.next_generation()
                         self.check_solution()
-                    # Clic sur le bouton Run All
+                    # Click on "Run All"
                     elif run_all_button.collidepoint(event.pos):
                         run_all = True
-                    # Clic sur le bouton Reset Game
+                    # Click on "Reset Game"
                     elif reset_button.collidepoint(event.pos):
                         self.reset_game()
                         run_all = False
                         self.check_solution()
 
-            # Run all generations automatically
+            # Automatically run all generations
             if run_all:
                 while not self.found:
                     self.next_generation()
