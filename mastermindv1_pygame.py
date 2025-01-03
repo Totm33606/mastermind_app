@@ -321,6 +321,11 @@ class MastermindGame:
         self.show_secret_code = show_secret_code
         self.show_best = show_best
         self.mutation_rate = mutation_rate
+        self.all_parameters = {
+            "Target Len": self.target_length,
+            "Pop size": self.population_size,
+            "Mutation Rate": self.mutation_rate,
+        }
         self.target_combination = generate_combination(target_length)
         self.generation = 0
         self.found = False
@@ -402,6 +407,50 @@ class MastermindGame:
                 for i in range(3)
             )
             pygame.draw.line(screen, blended_color, (0, y), (SCREEN_WIDTH, y))
+
+    def display_variables(
+        self,
+        screen,
+        font,
+        x,
+        y,
+        color,
+        bg_color=(200, 200, 200),
+        padding=10,
+        border_color=(0, 0, 0),
+        border_width=2,
+    ):
+        lines = [f"{name}: {value}" for name, value in self.all_parameters.items()]
+        text_surfaces = [font.render(line, True, color) for line in lines]
+
+        max_text_width = max(text.get_width() for text in text_surfaces)
+        total_height = (
+            sum(text.get_height() for text in text_surfaces)
+            + (len(text_surfaces) - 1) * 10
+        )
+
+        frame_width = max_text_width + 2 * padding
+        frame_height = total_height + 2 * padding
+        frame_x = x - frame_width // 2
+        frame_y = y
+
+        # Rectangle
+        pygame.draw.rect(
+            screen, bg_color, (frame_x, frame_y, frame_width, frame_height)
+        )
+        pygame.draw.rect(
+            screen,
+            border_color,
+            (frame_x, frame_y, frame_width, frame_height),
+            border_width,
+        )
+
+        # Text
+        current_y = frame_y + padding
+        for text in text_surfaces:
+            text_x = x - text.get_width() // 2
+            screen.blit(text, (text_x, current_y))
+            current_y += text.get_height() + 10
 
     def draw_button(
         self,
@@ -581,6 +630,9 @@ class MastermindGame:
             self.draw_gradient_background(
                 screen, (200, 200, 200), (100, 100, 100)
             )  # Light gray to dark gray
+
+            # Display the chosen parameters
+            self.display_variables(screen, font_small, 1150, 250, (0, 0, 0))
 
             if self.show_secret_code:
                 # Display 'Secret Code'
