@@ -11,7 +11,7 @@ Authors:
 
 Date: 01/01/2025
 
-This code is part of an educational project aimed at exploring genetic algorithms
+This code is part of an educational french project aimed at exploring genetic algorithms
 through an interactive Mastermind game.
 """
 
@@ -31,8 +31,8 @@ MIN_TARGET_LENGTH = 1
 MAX_TARGET_LENGTH = 7
 MIN_POPULATION_SIZE = 4
 MAX_POPULATION_SIZE = 10
-MIN_MUTATION_RATE = 0.0
-MAX_MUTATION_RATE = 1.0
+MIN_MUTATION_RATE = 0
+MAX_MUTATION_RATE = 100  # percentage
 SCREEN_WIDTH = 1500
 SCREEN_HEIGHT = 800
 
@@ -41,7 +41,7 @@ pygame.init()
 
 # Set up screen
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-pygame.display.set_caption("Mastermind Genetic Algorithm")
+pygame.display.set_caption("Jeu Mastermind : Algorithme Génétique")
 
 # Fonts
 font_large = pygame.font.Font(None, 70)
@@ -93,34 +93,39 @@ def get_top_combinations(population, scores, n):
     return survivors  # dict {index: combination}
 
 
-def crossover(parent1, parent2, length):
-    return [random.choice([parent1[i], parent2[i]]) for i in range(length)]
+def crossover(parent1, parent2):
+    return [random.choice([parent1[i], parent2[i]]) for i in range(len(parent1))]
 
 
-def mutate(combination, length):
-    index_to_mutate = random.randint(0, length - 1)
-    new_color = random.choice(
-        [color for color in COLORS if color != combination[index_to_mutate]]
-    )
-    combination[index_to_mutate] = new_color
-    return combination
+def mutate(individual, mutation_rate):
+    mutation_rate = float(mutation_rate) / 100.0  # From percentage to float
+    for i in range(len(individual)):
+        if random.random() < mutation_rate:
+            individual[i] = random.choice(
+                [color for color in COLORS if color != individual[i]]
+            )
+    return individual
 
 
 ##---START SCREEN---##
 ##------------------##
 class StartScreen:
     def __init__(self):
+        # Settings for the start screen inputs
         self.settings = {
             "target_length": {"value": 4, "active": False, "input": "4"},
             "population_size": {"value": 8, "active": False, "input": "8"},
-            "mutation_rate": {"value": 0.8, "active": False, "input": "0.8"},
+            "mutation_rate": {"value": 80, "active": False, "input": "80"},
         }
         self.show_secret_code = True
         self.show_best = True
 
     def draw_input_field(self, x, y, width, key):
+        # Draw an input field for numeric settings
         field = self.settings[key]
-        color = (0, 0, 0) if not field["active"] else (255, 0, 0)
+        color = (
+            (0, 0, 0) if not field["active"] else (255, 0, 0)
+        )  # Active field highlighted
         pygame.draw.rect(screen, (255, 255, 255), (x, y, width, 40), border_radius=10)
         pygame.draw.rect(screen, color, (x, y, width, 40), 2, border_radius=10)
         text_surface = font_small.render(field["input"], True, (0, 0, 0))
@@ -129,6 +134,7 @@ class StartScreen:
     def draw_button(
         self, x, y, text, font, bg_color, text_color, border_color, hover=False
     ):
+        # Draw a button with hover effect
         text_surface = font.render(text, True, text_color)
         text_width, text_height = text_surface.get_size()
         button_width = text_width + 40
@@ -150,7 +156,6 @@ class StartScreen:
             3,
             border_radius=10,
         )
-
         screen.blit(
             text_surface,
             (
@@ -161,6 +166,7 @@ class StartScreen:
         return pygame.Rect(x, y, button_width, button_height)
 
     def draw_checkbox(self, x, y, text, checked):
+        # Draw a checkbox with label
         text_surface = font_medium.render(text, True, (0, 0, 0))
         screen.blit(text_surface, (x, y + 2))
         box_size = 40
@@ -168,6 +174,7 @@ class StartScreen:
         pygame.draw.rect(screen, (0, 0, 0), (box_x, y, box_size, box_size), 2)
 
         if checked:
+            # Draw the check mark
             pygame.draw.line(
                 screen, (0, 0, 0), (box_x + 5, y + 20), (box_x + 15, y + 35), 3
             )
@@ -178,6 +185,7 @@ class StartScreen:
         return pygame.Rect(box_x, y, box_size, box_size)
 
     def handle_events(self, event):
+        # Handle user input and interactions
         if event.type == pygame.MOUSEBUTTONDOWN:
             mouse_pos = pygame.mouse.get_pos()
             for key, field in self.settings.items():
@@ -193,27 +201,28 @@ class StartScreen:
             for key, field in self.settings.items():
                 if field["active"]:
                     if event.key == pygame.K_BACKSPACE:
-                        field["input"] = field["input"][:-1]
+                        field["input"] = field["input"][:-1]  # Remove last character
                     elif event.key == pygame.K_RETURN:
-                        field["active"] = False
+                        field["active"] = False  # Deactivate field
                         self.apply_field_value(key)
                     else:
                         field["input"] += event.unicode
 
     def activate_field(self, key):
+        # Activate the clicked input field and deactivate others
         for field_key in self.settings.keys():
             self.settings[field_key]["active"] = field_key == key
 
     def apply_field_value(self, key):
+        # Apply and validate numeric input
         try:
-            if key == "mutation_rate":
-                self.settings[key]["value"] = float(self.settings[key]["input"])
-            else:
-                self.settings[key]["value"] = int(self.settings[key]["input"])
+            self.settings[key]["value"] = int(self.settings[key]["input"])
         except ValueError:
+            # Restore previous value if input is invalid
             self.settings[key]["input"] = str(self.settings[key]["value"])
 
     def validate_value(self, key, value):
+        # Validate input values based on parameter ranges
         if key == "target_length":
             return max(MIN_TARGET_LENGTH, min(MAX_TARGET_LENGTH, value))
         elif key == "population_size":
@@ -223,6 +232,7 @@ class StartScreen:
         return value
 
     def start_game(self):
+        # Start the game with validated input settings
         try:
             target_length = self.validate_value(
                 "target_length", int(self.settings["target_length"]["input"])
@@ -231,15 +241,15 @@ class StartScreen:
                 "population_size", int(self.settings["population_size"]["input"])
             )
             mutation_rate = self.validate_value(
-                "mutation_rate", float(self.settings["mutation_rate"]["input"])
+                "mutation_rate", int(self.settings["mutation_rate"]["input"])
             )
         except ValueError:
-            # Fallback to the last valid settings in case of unexpected issues
+            # Use fallback values if input validation fails
             target_length = self.settings["target_length"]["value"]
             population_size = self.settings["population_size"]["value"]
             mutation_rate = self.settings["mutation_rate"]["value"]
 
-        # Launch the game with validated settings
+        # Launch the game
         game = MastermindGame(
             target_length=target_length,
             population_size=population_size,
@@ -250,11 +260,12 @@ class StartScreen:
         game.run_game()
 
     def show(self):
+        # Main loop for the start screen
         running = True
         while running:
             screen.fill((240, 248, 255))  # AliceBlue background
             title_text = font_large.render(
-                "Mastermind Genetic Algorithm", True, (86, 180, 233)
+                "Jeu Mastermind : Algorithme Génétique", True, (86, 180, 233)
             )
             screen.blit(
                 title_text, (SCREEN_WIDTH // 2 - title_text.get_width() // 2, 50)
@@ -262,9 +273,9 @@ class StartScreen:
 
             y_offset = 180
             for key, label, label_x in [
-                ("target_length", "Target Length", 240),
-                ("population_size", "Population Size", 275),
-                ("mutation_rate", "Mutation Rate", 240),
+                ("target_length", "Taille Code Secret", 315),
+                ("population_size", "Taille Population", 295),
+                ("mutation_rate", "Mutation (%)", 220),
             ]:
                 label_surface = font_medium.render(label, True, (0, 0, 0))
                 label_x = SCREEN_WIDTH // 2 - label_x
@@ -276,10 +287,13 @@ class StartScreen:
 
             # Checkboxes
             self.checkbox_secret_rect = self.draw_checkbox(
-                SCREEN_WIDTH // 2 - 180, 405, "Show Secret Code", self.show_secret_code
+                SCREEN_WIDTH // 2 - 295,
+                405,
+                "Afficher Code Secret",
+                self.show_secret_code,
             )
             self.checkbox_best_rect = self.draw_checkbox(
-                SCREEN_WIDTH // 2 - 180, 480, "Show Best Codes", self.show_best
+                SCREEN_WIDTH // 2 - 280, 480, "Afficher Survivants", self.show_best
             )
 
             # Start Button
@@ -290,7 +304,7 @@ class StartScreen:
             self.start_button_rect = self.draw_button(
                 SCREEN_WIDTH // 2 - 100,
                 700,
-                "Start Game",
+                "Jouer",
                 font_medium,
                 (0, 158, 115),
                 (0, 0, 0),
@@ -322,14 +336,14 @@ class MastermindGame:
         self.show_best = show_best
         self.mutation_rate = mutation_rate
         self.all_parameters = {
-            "Target Len": self.target_length,
-            "Pop size": self.population_size,
-            "Mutation Rate": self.mutation_rate,
+            "Taille Code Secret": self.target_length,
+            "Taille Population": self.population_size,
+            "Mutation (%)": self.mutation_rate,
         }
         self.target_combination = generate_combination(target_length)
         self.generation = 0
         self.found = False
-        self.secrets_found = []
+        self.secrets_found, self.all_secrets_found = [], []
 
         # dict {index: combination}
         self.population = {
@@ -375,7 +389,7 @@ class MastermindGame:
 
             # Display the score of each combination
             score_text = font_small.render(
-                f"Score: {self.scores[idx]}", True, (0, 0, 0)
+                f"Score : {self.scores[idx]}", True, (0, 0, 0)
             )
             screen.blit(score_text, (650, y_offset + idx * 69))
 
@@ -509,7 +523,10 @@ class MastermindGame:
         histogram_y = SCREEN_HEIGHT - histogram_height - 200
 
         # Scale calculations
-        max_iterations = max(self.secrets_found) if self.secrets_found else 1
+        if self.secrets_found and max(self.secrets_found) > 0:
+            max_iterations = max(self.secrets_found)
+        else:
+            max_iterations = 1
         bar_width = histogram_width / 10
         scale = histogram_height / max_iterations
 
@@ -552,10 +569,13 @@ class MastermindGame:
             text_y = bar_y - value_text.get_height() - 2  # Place above the bar
             screen.blit(value_text, (text_x, text_y))
 
-    def check_solution(self):
+    def check_solution(self, run_many_exp=False):
         if self.target_length in self.scores.values() and not self.found:
             self.found = True
-            self.secrets_found.append(self.generation)
+            if run_many_exp:
+                self.all_secrets_found.append(self.generation)
+            else:
+                self.secrets_found.append(self.generation)
 
     def reset_game(self):
         # Reset variables
@@ -589,11 +609,8 @@ class MastermindGame:
         self.population = self.survivors
 
         # Mutation step
-        if random.random() < self.mutation_rate:
-            random_index = random.choice(list(self.population.keys()))
-            self.population[random_index] = mutate(
-                self.population[random_index], self.target_length
-            )
+        for key in self.population.keys():
+            self.population[key] = mutate(self.population[key], self.mutation_rate)
 
         # Fill up the population
         survivors = list(self.population.values())
@@ -601,14 +618,9 @@ class MastermindGame:
             set(range(1, self.population_size + 1)) - set(self.population.keys())
         )
         idx_count = 0
-        while (
-            len(self.population) < self.population_size
-            and idx_count < self.population_size - self.population_size // 2
-        ):
+        while idx_count < self.population_size - self.population_size // 2:
             parents = random.sample(survivors, 2)
-            self.population[missing_idx[idx_count]] = crossover(
-                parents[0], parents[1], self.target_length
-            )
+            self.population[missing_idx[idx_count]] = crossover(parents[0], parents[1])
             idx_count += 1
 
         # Calculate new scores
@@ -620,6 +632,18 @@ class MastermindGame:
         self.survivors = get_top_combinations(
             self.population, self.scores, self.population_size // 2
         )
+
+    def run_many_experiments(self, num_exp=500):
+        del self.all_secrets_found
+        self.all_secrets_found = []
+        for i in range(num_exp):
+            self.reset_game()
+            while not self.found:
+                self.next_generation()
+                self.check_solution(run_many_exp=True)
+        print(
+            sum(self.all_secrets_found) / len(self.all_secrets_found)
+        )  # Print on terminal
 
     def run_game(self):
         running = True
@@ -637,7 +661,7 @@ class MastermindGame:
             if self.show_secret_code:
                 # Display 'Secret Code'
                 self.draw_secret_code()
-                secret_text = font_medium.render("Secret code:", True, (0, 0, 0))
+                secret_text = font_medium.render("Code Secret :", True, (0, 0, 0))
                 screen.blit(
                     secret_text, (SCREEN_WIDTH - 375 - secret_text.get_width() // 2, 25)
                 )
@@ -647,7 +671,7 @@ class MastermindGame:
 
             # Display generation number
             generation_text = font_medium.render(
-                f"Generation: {self.generation}", True, (0, 0, 0)
+                f"Génération : {self.generation}", True, (0, 0, 0)
             )
             screen.blit(
                 generation_text,
@@ -675,7 +699,7 @@ class MastermindGame:
             next_gen_button = self.draw_button(
                 20,
                 button_y,
-                "Next Generation",
+                "Génération Suivante",
                 font_medium,
                 (0, 158, 115),
                 (0, 0, 0),
@@ -685,7 +709,7 @@ class MastermindGame:
             run_all_button = self.draw_button(
                 SCREEN_WIDTH - 180,
                 button_y,
-                "Run All",
+                "Auto",
                 font_medium,
                 (86, 180, 233),
                 (0, 0, 0),
@@ -695,9 +719,19 @@ class MastermindGame:
             reset_button = self.draw_button(
                 SCREEN_WIDTH // 2 - 100,
                 button_y,
-                "Reset Game",
+                "Réinitialiser Partie",
                 font_medium,
                 (230, 159, 0),
+                (0, 0, 0),
+                (0, 0, 0),
+                hover=reset_hover,
+            )
+            run_many_exp_button = self.draw_button(
+                25,
+                0,
+                "Lancer expériences",
+                font_small,
+                (240, 228, 66),
                 (0, 0, 0),
                 (0, 0, 0),
                 hover=reset_hover,
@@ -718,6 +752,12 @@ class MastermindGame:
                         run_all = True
                     # Click on "Reset Game"
                     elif reset_button.collidepoint(event.pos):
+                        self.reset_game()
+                        run_all = False
+                        self.check_solution()
+                    # Click on "Launch experiments"
+                    elif run_many_exp_button.collidepoint(event.pos):
+                        self.run_many_experiments()
                         self.reset_game()
                         run_all = False
                         self.check_solution()
