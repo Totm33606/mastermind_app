@@ -299,7 +299,7 @@ class StartScreen:
             # Start Button
             mouse_pos = pygame.mouse.get_pos()
             start_hover = pygame.Rect(
-                SCREEN_WIDTH // 2 - 100, 700, 200, 60
+                SCREEN_WIDTH // 2 - 100, 700, 140, 60
             ).collidepoint(mouse_pos)
             self.start_button_rect = self.draw_button(
                 SCREEN_WIDTH // 2 - 100,
@@ -339,6 +339,7 @@ class MastermindGame:
             "Taille Code Secret": self.target_length,
             "Taille Population": self.population_size,
             "Mutation (%)": self.mutation_rate,
+            "Moyenne expériences": 0,
         }
         self.target_combination = generate_combination(target_length)
         self.generation = 0
@@ -641,9 +642,9 @@ class MastermindGame:
             while not self.found:
                 self.next_generation()
                 self.check_solution(run_many_exp=True)
-        print(
-            sum(self.all_secrets_found) / len(self.all_secrets_found)
-        )  # Print on terminal
+        self.all_parameters["Moyenne expériences"] = sum(self.all_secrets_found) / len(
+            self.all_secrets_found
+        )
 
     def run_game(self):
         running = True
@@ -656,7 +657,7 @@ class MastermindGame:
             )  # Light gray to dark gray
 
             # Display the chosen parameters
-            self.display_variables(screen, font_small, 1150, 250, (0, 0, 0))
+            self.display_variables(screen, font_small, 1150, 190, (0, 0, 0))
 
             if self.show_secret_code:
                 # Display 'Secret Code'
@@ -684,16 +685,17 @@ class MastermindGame:
             # Interactive buttons
             mouse_pos = pygame.mouse.get_pos()
             next_gen_hover = (
-                0 < mouse_pos[0] < 180 and button_y < mouse_pos[1] < button_y + 70
+                20 < mouse_pos[0] < 400 and button_y < mouse_pos[1] < button_y + 70
             )
             run_all_hover = (
-                SCREEN_WIDTH - 200 < mouse_pos[0] < SCREEN_WIDTH
+                SCREEN_WIDTH - 180 < mouse_pos[0] < SCREEN_WIDTH - 60
                 and button_y < mouse_pos[1] < button_y + 70
             )
             reset_hover = (
-                SCREEN_WIDTH // 2 - 90 < mouse_pos[0] < SCREEN_WIDTH // 2 + 90
+                SCREEN_WIDTH // 2 - 100 < mouse_pos[0] < SCREEN_WIDTH // 2 + 255
                 and button_y < mouse_pos[1] < button_y + 70
             )
+            run_many_exp_hover = 25 < mouse_pos[0] < 330 and 0 < mouse_pos[1] < 50
 
             # Draw buttons
             next_gen_button = self.draw_button(
@@ -734,7 +736,7 @@ class MastermindGame:
                 (240, 228, 66),
                 (0, 0, 0),
                 (0, 0, 0),
-                hover=reset_hover,
+                hover=run_many_exp_hover,
             )
 
             pygame.display.update()
