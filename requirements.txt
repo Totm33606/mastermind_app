@@ -1,4 +1,4 @@
-pygame==2.6.1 
+pygame==2.6.1 # V1
 
 # random, collections.Counter, and heapq are standard
 # modules already included in Python
