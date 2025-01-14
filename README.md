@@ -25,7 +25,7 @@ Dans ces deux versions, le jeu est résolu par un **algorithme génétique**, qu
 ## 🛠 Installation
 
 ### Pré-requis
-- Python 3.8 ou supérieur. Version utilisée pour le développement Python 3.12.3
+- `Python 3.8` ou supérieur.
 - Les dépendances nécessaires sont listées dans le fichier `requirements.txt`.
 - `Tkinter`est généralement inclus dans les installations de Python de base.
 Si besoin, sous Linux (Debian/Ubuntu), installez les paquets manquants :
@@ -47,11 +47,22 @@ Pour la version `PyGame` :
 python mastermindv1_pygame.py
 ```
 
+### Versions utilisées pour le développement
+- `Python 3.12.3`
+- `PyGame 2.6.1`
+- `Tkinter 8.6`
+
 ---
 
 ## ✨ Auteurs et Contacts
 
 Cette application a été développée dans le cadre d'un projet, par des étudiants ingénieurs,
 et encadrée par des membres de **ANITI** et de **La Compagnie du Code**.
+
+Développeurs :
 - Thomas Chambon : t_chambo@insa-toulouse.fr
 - Adam Medbouhi : medbouhi@insa-toulouse.fr
+
+Encadrants : 
+- Marjorie Allain-Moulet : marjorie.allain-moulet@cs-soprasteria.com
+- Nicolas Decoster : nicolas.decoster@mailbox.org
