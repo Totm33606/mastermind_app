@@ -527,7 +527,7 @@ class MastermindGame:
         histogram_width = 500
         histogram_height = 200
         histogram_x = 900
-        histogram_y = SCREEN_HEIGHT - histogram_height - 150
+        histogram_y = SCREEN_HEIGHT - histogram_height - 130
 
         # Scale calculations
         if self.secrets_found and max(self.secrets_found) > 0:
