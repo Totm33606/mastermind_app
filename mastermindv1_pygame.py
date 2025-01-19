@@ -21,6 +21,7 @@ import pygame
 import random
 from collections import Counter
 import heapq
+import statistics
 
 ##---CONSTANTS VARIABLES AND INIT---##
 ##----------------------------------##
@@ -41,12 +42,13 @@ pygame.init()
 
 # Set up screen
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-pygame.display.set_caption("Jeu Mastermind : Algorithme Génétique")
+pygame.display.set_caption("Bienvenue dans le jeu Mastermind !")
 
 # Fonts
 font_large = pygame.font.Font(None, 70)
 font_medium = pygame.font.Font(None, 50)
 font_small = pygame.font.Font(None, 40)
+font_super_small = pygame.font.Font(None, 30)
 
 
 ##---GENERIC FUNCTIONS---##
@@ -265,7 +267,7 @@ class StartScreen:
         while running:
             screen.fill((240, 248, 255))  # AliceBlue background
             title_text = font_large.render(
-                "Jeu Mastermind : Algorithme Génétique", True, (86, 180, 233)
+                "Bienvenue dans le jeu Mastermind !", True, (86, 180, 233)
             )
             screen.blit(
                 title_text, (SCREEN_WIDTH // 2 - title_text.get_width() // 2, 50)
@@ -273,7 +275,7 @@ class StartScreen:
 
             y_offset = 180
             for key, label, label_x in [
-                ("target_length", "Taille Code Secret", 315),
+                ("target_length", "Longueur Code Secret", 390),
                 ("population_size", "Taille Population", 295),
                 ("mutation_rate", "Mutation (%)", 220),
             ]:
@@ -335,12 +337,7 @@ class MastermindGame:
         self.show_secret_code = show_secret_code
         self.show_best = show_best
         self.mutation_rate = mutation_rate
-        self.all_parameters = {
-            "Taille Code Secret": self.target_length,
-            "Taille Population": self.population_size,
-            "Mutation (%)": self.mutation_rate,
-            "Moyenne expériences": 0,
-        }
+        self.stats_exp = {"Min": 0, "Max": 0, "Moyenne": 0, "Ecart-type": 0}
         self.target_combination = generate_combination(target_length)
         self.generation = 0
         self.found = False
@@ -394,14 +391,22 @@ class MastermindGame:
             )
             screen.blit(score_text, (650, y_offset + idx * 69))
 
+            # Shows in red if we have found the target
+            if self.scores[idx] == self.target_length:
+                color = (230, 159, 0)  # Red
+                width = 8
+            else:
+                color = (0, 0, 0)  # Black
+                width = 4
+
             # Highlight the best combinations if show_best is True
             if self.show_best and idx in self.survivors.keys():
                 pygame.draw.rect(
                     screen,
-                    (0, 0, 0),
+                    color,
                     (75, y_offset + idx * 70 - 25, 560, 50),
-                    4,
-                    border_radius=5,
+                    width,
+                    border_radius=50,
                 )
 
     def draw_secret_code(self):
@@ -425,6 +430,7 @@ class MastermindGame:
 
     def display_variables(
         self,
+        dict_var,
         screen,
         font,
         x,
@@ -435,7 +441,7 @@ class MastermindGame:
         border_color=(0, 0, 0),
         border_width=2,
     ):
-        lines = [f"{name}: {value}" for name, value in self.all_parameters.items()]
+        lines = [f"{name} : {value}" for name, value in dict_var.items()]
         text_surfaces = [font.render(line, True, color) for line in lines]
 
         max_text_width = max(text.get_width() for text in text_surfaces)
@@ -511,7 +517,7 @@ class MastermindGame:
         screen.blit(text_surface, (text_x, text_y))
         return pygame.Rect(x, y, button_width, button_height)
 
-    def draw_histogram(self):
+    def draw_histogram(self, title_hist):
         if len(self.secrets_found) > 10:
             temp = self.secrets_found[-1]
             del self.secrets_found
@@ -521,7 +527,7 @@ class MastermindGame:
         histogram_width = 500
         histogram_height = 200
         histogram_x = 900
-        histogram_y = SCREEN_HEIGHT - histogram_height - 200
+        histogram_y = SCREEN_HEIGHT - histogram_height - 150
 
         # Scale calculations
         if self.secrets_found and max(self.secrets_found) > 0:
@@ -569,6 +575,23 @@ class MastermindGame:
             )  # Center text horizontally
             text_y = bar_y - value_text.get_height() - 2  # Place above the bar
             screen.blit(value_text, (text_x, text_y))
+
+        # Add the title below the histogram
+        title_text = font_small.render(title_hist, True, (0, 0, 0))  # Blue text
+        title_x = (
+            histogram_x + (histogram_width - title_text.get_width()) // 2
+        )  # Center title
+        title_y = histogram_y + histogram_height + 10  # Slightly below the histogram
+        title_bg_padding = 10  # Padding around the title text
+        title_bg_rect = pygame.Rect(
+            title_x - title_bg_padding // 2,
+            title_y - title_bg_padding // 2,
+            title_text.get_width() + title_bg_padding,
+            title_text.get_height() + title_bg_padding,
+        )
+        pygame.draw.rect(screen, (200, 200, 200), title_bg_rect)  # White background
+        pygame.draw.rect(screen, (0, 0, 0), title_bg_rect, 2)  # Black border
+        screen.blit(title_text, (title_x, title_y))
 
     def check_solution(self, run_many_exp=False):
         if self.target_length in self.scores.values() and not self.found:
@@ -634,19 +657,32 @@ class MastermindGame:
             self.population, self.scores, self.population_size // 2
         )
 
-    def run_many_experiments(self, num_exp=500):
+    def run_many_experiments(self, num_exp=200):
         del self.all_secrets_found
         self.all_secrets_found = []
+
+        # Run exp
         for i in range(num_exp):
             self.reset_game()
             while not self.found:
                 self.next_generation()
                 self.check_solution(run_many_exp=True)
-        self.all_parameters["Moyenne expériences"] = sum(self.all_secrets_found) / len(
-            self.all_secrets_found
+
+        # Logs stats for printing
+        self.stats_exp["Min"] = min(self.all_secrets_found)
+        self.stats_exp["Max"] = max(self.all_secrets_found)
+        self.stats_exp["Moyenne"] = round(
+            sum(self.all_secrets_found) / len(self.all_secrets_found)
         )
+        self.stats_exp["Ecart-type"] = round(statistics.stdev(self.all_secrets_found))
 
     def run_game(self):
+        # Fixed values
+        dict_params = {
+            "Longueur Code Secret": self.target_length,
+            "Taille Population": self.population_size,
+            "Mutation (%)": self.mutation_rate,
+        }
         running = True
         run_all = False
         self.check_solution()  # If the initial population contains the solution
@@ -657,7 +693,14 @@ class MastermindGame:
             )  # Light gray to dark gray
 
             # Display the chosen parameters
-            self.display_variables(screen, font_small, 1150, 190, (0, 0, 0))
+            self.display_variables(
+                dict_params, screen, font_small, 1150, 140, (0, 0, 0)
+            )
+
+            # Display the stats
+            self.display_variables(
+                self.stats_exp, screen, font_small, 1280, 280, (0, 0, 0)
+            )
 
             if self.show_secret_code:
                 # Display 'Secret Code'
@@ -668,7 +711,7 @@ class MastermindGame:
                 )
 
             self.draw_population()
-            self.draw_histogram()
+            self.draw_histogram("10 Dernières Parties")
 
             # Display generation number
             generation_text = font_medium.render(
@@ -688,14 +731,14 @@ class MastermindGame:
                 20 < mouse_pos[0] < 400 and button_y < mouse_pos[1] < button_y + 70
             )
             run_all_hover = (
-                SCREEN_WIDTH - 180 < mouse_pos[0] < SCREEN_WIDTH - 60
+                SCREEN_WIDTH - 240 < mouse_pos[0] < SCREEN_WIDTH - 20
                 and button_y < mouse_pos[1] < button_y + 70
             )
             reset_hover = (
-                SCREEN_WIDTH // 2 - 100 < mouse_pos[0] < SCREEN_WIDTH // 2 + 255
+                SCREEN_WIDTH // 2 - 100 < mouse_pos[0] < SCREEN_WIDTH // 2 + 200
                 and button_y < mouse_pos[1] < button_y + 70
             )
-            run_many_exp_hover = 25 < mouse_pos[0] < 330 and 0 < mouse_pos[1] < 50
+            run_many_exp_hover = 930 < mouse_pos[0] < 1160 and 340 < mouse_pos[1] < 395
 
             # Draw buttons
             next_gen_button = self.draw_button(
@@ -709,9 +752,9 @@ class MastermindGame:
                 hover=next_gen_hover,
             )
             run_all_button = self.draw_button(
-                SCREEN_WIDTH - 180,
+                SCREEN_WIDTH - 240,
                 button_y,
-                "Auto",
+                "Finir Partie",
                 font_medium,
                 (86, 180, 233),
                 (0, 0, 0),
@@ -721,7 +764,7 @@ class MastermindGame:
             reset_button = self.draw_button(
                 SCREEN_WIDTH // 2 - 100,
                 button_y,
-                "Réinitialiser Partie",
+                "Nouvelle Partie",
                 font_medium,
                 (230, 159, 0),
                 (0, 0, 0),
@@ -729,10 +772,10 @@ class MastermindGame:
                 hover=reset_hover,
             )
             run_many_exp_button = self.draw_button(
-                25,
-                0,
-                "Lancer expériences",
-                font_small,
+                930,
+                350,
+                "Lancer 200 Parties",
+                font_super_small,
                 (240, 228, 66),
                 (0, 0, 0),
                 (0, 0, 0),
