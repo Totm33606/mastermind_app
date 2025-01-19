@@ -6,7 +6,7 @@ from tkinter import messagebox
 COLORS = ["Red", "Blue", "Green", "Yellow", "Black", "White"]
 MUTATION_RATE = 0.1
 EXACT_MATCH = 1
-PARTIAL_MATCH = 0.5
+PARTIAL_MATCH = 0
 
 
 def generate_combination(length):
@@ -30,7 +30,7 @@ def score_combination(combination, target):
             partial_match += 1
             target_counts[color] -= 1
 
-    return exact_match * EXACT_MATCH + partial_match * PARTIAL_MATCH
+    return int(exact_match * EXACT_MATCH + partial_match * PARTIAL_MATCH)
 
 
 def crossover(parent1, parent2, length):

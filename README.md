@@ -25,21 +25,20 @@ Dans ces deux versions, le jeu est résolu par un **algorithme génétique**, qu
 ## 🛠 Installation
 
 ### Pré-requis
-- `Python 3.8` ou supérieur.
-- Les dépendances nécessaires sont listées dans le fichier `requirements.txt`.
-- `Tkinter`est généralement inclus dans les installations de Python de base.
-Si besoin, sous Linux (Debian/Ubuntu), installez les paquets manquants :
-```bash
-sudo apt-get install python3-tk
-```
+Vous aurez besoin d'Anaconda pour les étapes qui suivront. Vous pouvez le télécharger
+dés à présent [ici](https://www.anaconda.com/products/distribution).
 
 ### Étapes d'installation
-Clonez le dépôt :  
+Nous vous proposons de passer par un environnement virtuel, avec Anaconda.
+Commencez par cloner le dépôt distant puis suivez les étapes ci-dessous :
 ```bash
 git clone https://github.com/Totm33606/mastermind_app.git
 cd mastermind_app
-pip install -r requirements.txt
+conda create --name env_mastermind python=3.8 # Création de l'environnement
+conda activate env_mastermind # Activation de l'environnement
+pip install -r requirements.txt # Installation des dépendances
 ```
+Une fois cela fait, vous êtes désormais prêts à jouer ! 
 
 ### Lancer une partie
 Pour la version `PyGame` :
